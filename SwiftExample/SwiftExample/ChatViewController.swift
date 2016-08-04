@@ -20,6 +20,9 @@ class ChatViewController: JSQMessagesViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        // Setup navigation
+        setupBackButton()
+        
         /**
          *  Override point:
          *
@@ -28,7 +31,7 @@ class ChatViewController: JSQMessagesViewController {
          *
          */
         
-        if defaults.boolForKey(taillessSettingKey) {
+        if defaults.boolForKey(Setting.removeBubbleTails.rawValue) {
             // Make taillessBubbles
             incomingBubble = JSQMessagesBubbleImageFactory(bubbleImage: UIImage.jsq_bubbleCompactTaillessImage(), capInsets: UIEdgeInsetsZero, layoutDirection: UIApplication.sharedApplication().userInterfaceLayoutDirection).incomingMessagesBubbleImageWithColor(UIColor.jsq_messageBubbleBlueColor())
             outgoingBubble = JSQMessagesBubbleImageFactory(bubbleImage: UIImage.jsq_bubbleCompactTaillessImage(), capInsets: UIEdgeInsetsZero, layoutDirection: UIApplication.sharedApplication().userInterfaceLayoutDirection).outgoingMessagesBubbleImageWithColor(UIColor.lightGrayColor())
@@ -43,7 +46,7 @@ class ChatViewController: JSQMessagesViewController {
          *  Example on showing or removing Avatars based on user settings.
          */
         
-        if defaults.boolForKey(avatarSettingKey) {
+        if defaults.boolForKey(Setting.removeAvatar.rawValue) {
             collectionView?.collectionViewLayout.incomingAvatarViewSize = .zero
             collectionView?.collectionViewLayout.outgoingAvatarViewSize = .zero
         } else {
@@ -61,6 +64,14 @@ class ChatViewController: JSQMessagesViewController {
 
         self.collectionView?.reloadData()
         self.collectionView?.layoutIfNeeded()
+    }
+    
+    func setupBackButton() {
+        let backButton = UIBarButtonItem(title: "Back", style: UIBarButtonItemStyle.Plain, target: self, action: #selector(backButtonTapped))
+        navigationItem.leftBarButtonItem = backButton
+    }
+    func backButtonTapped() {
+        dismissViewControllerAnimated(true, completion: nil)
     }
     
     func receiveMessagePressed(sender: UIBarButtonItem) {
@@ -340,6 +351,22 @@ class ChatViewController: JSQMessagesViewController {
         return getAvatar(message.senderId)
     }
     
+    override func collectionView(collectionView: JSQMessagesCollectionView, attributedTextForCellTopLabelAtIndexPath indexPath: NSIndexPath) -> NSAttributedString? {
+        /**
+         *  This logic should be consistent with what you return from `heightForCellTopLabelAtIndexPath:`
+         *  The other label text delegate methods should follow a similar pattern.
+         *
+         *  Show a timestamp for every 3rd message
+         */
+        if (indexPath.item % 3 == 0) {
+            let message = self.messages[indexPath.item]
+            
+            return JSQMessagesTimestampFormatter.sharedFormatter().attributedTimestampForDate(message.date)
+        }
+        
+        return nil
+    }
+    
     override func collectionView(collectionView: JSQMessagesCollectionView, attributedTextForMessageBubbleTopLabelAtIndexPath indexPath: NSIndexPath) -> NSAttributedString? {
         let message = messages[indexPath.item]
         
@@ -347,16 +374,64 @@ class ChatViewController: JSQMessagesViewController {
         //Mark: Removing Sender Display Name
         /**
          *  Example on showing or removing senderDisplayName based on user settings.
+         *  This logic should be consistent with what you return from `heightForCellTopLabelAtIndexPath:`
          */
-        if message.senderId == self.senderId() && defaults.boolForKey(removeSenderDisplayNameKey) {
+        if defaults.boolForKey(Setting.removeSenderDisplayName.rawValue) {
+            return nil
+        }
+        
+        if message.senderId == self.senderId() {
             return nil
         }
 
         return NSAttributedString(string: message.senderDisplayName)
     }
+    
+    override func collectionView(collectionView: JSQMessagesCollectionView, layout collectionViewLayout: JSQMessagesCollectionViewFlowLayout, heightForCellTopLabelAtIndexPath indexPath: NSIndexPath) -> CGFloat {
+        /**
+         *  Each label in a cell has a `height` delegate method that corresponds to its text dataSource method
+         */
+        
+        /**
+         *  This logic should be consistent with what you return from `attributedTextForCellTopLabelAtIndexPath:`
+         *  The other label height delegate methods should follow similarly
+         *
+         *  Show a timestamp for every 3rd message
+         */
+        if indexPath.item % 3 == 0 {
+            return kJSQMessagesCollectionViewCellLabelHeightDefault
+        }
+        
+        return 0.0
+    }
 
     override func collectionView(collectionView: JSQMessagesCollectionView, layout collectionViewLayout: JSQMessagesCollectionViewFlowLayout, heightForMessageBubbleTopLabelAtIndexPath indexPath: NSIndexPath) -> CGFloat {
-        return messages[indexPath.item].senderId == AvatarIdWoz && defaults.boolForKey(removeSenderDisplayNameKey) ? 0 : kJSQMessagesCollectionViewCellLabelHeightDefault
+        
+        /**
+         *  Example on showing or removing senderDisplayName based on user settings.
+         *  This logic should be consistent with what you return from `attributedTextForCellTopLabelAtIndexPath:`
+         */
+        if defaults.boolForKey(Setting.removeSenderDisplayName.rawValue) {
+            return 0.0
+        }
+        
+        /**
+         *  iOS7-style sender name labels
+         */
+        let currentMessage = self.messages[indexPath.item]
+        
+        if currentMessage.senderId == self.senderId() {
+            return 0.0
+        }
+        
+        if indexPath.item - 1 > 0 {
+            let previousMessage = self.messages[indexPath.item - 1]
+            if previousMessage.senderId == currentMessage.senderId {
+                return 0.0
+            }
+        }
+        
+        return kJSQMessagesCollectionViewCellLabelHeightDefault;
     }
     
 }
